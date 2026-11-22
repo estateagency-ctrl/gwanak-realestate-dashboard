@@ -10,6 +10,12 @@
 - `data/` 안의 캐시·매물 파일을 지우거나 덮어쓰기 전에는 사용자에게 먼저 묻는다(특히 `data/listings.json` 은 사용자가 등록한 매물).
 - API 키는 `config.json` 에만 둔다. 다른 파일·문서·외부 요청 로그에 키를 적지 않는다.
 
+## GitHub (공개 저장소)
+- https://github.com/estateagency-ctrl/gwanak-realestate-dashboard (public, 브랜치 main)
+- **절대 커밋 금지**: `config.json`(API 키), `public/assets/card.png`(대표자 이름이 찍힌 명함), `backup/`, 캐시·로그 — `.gitignore` 에 등록됨. 커밋 전 `git status` 로 확인하고, 키 문자열이 포함된 파일이 없는지 검사한다.
+- 새 설정 항목을 추가하면 `config.example.json` 에도 빈 값으로 추가한다.
+- 커밋·푸시는 사용자가 요청할 때만 한다.
+
 ## 실행
 - `node server.js` (Node 18+, 외부 패키지 없음) → http://localhost:8790 . 또는 `대시보드실행.command` 더블클릭.
 - 포트 **8790** (8787은 다른 프로그램이 사용 중).

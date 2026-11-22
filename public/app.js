@@ -78,65 +78,19 @@ function filt(rows) {
 const dongLabel = () => S.dong === 'all' ? '관악구 전체' : S.dong.split(':')[1] + (S.dong[0] === 'H' ? '(행정동)' : '(법정동)');
 
 // ---------- 초기화 ----------
-// ---------- 로딩 팝업 ----------
-const Loader = {
-  t0: 0, timer: null, steps: [],
-  open(title, steps) {
-    this.steps = steps.map(([key, label]) => ({ key, label, st: 'wait' }));
-    this.t0 = Date.now();
-    $('#ldTitle').textContent = title;
-    $('#ldErr').hidden = true; $('#ldClose').hidden = true;
-    this.draw();
-    $('#loader').classList.add('on');
-    clearInterval(this.timer);
-    this.timer = setInterval(() => {
-      const s = Math.floor((Date.now() - this.t0) / 1000);
-      $('#ldTime').textContent = `${s}초 경과`;
-      if (s >= 15) $('#ldClose').hidden = false; // 오래 걸리면 먼저 화면을 볼 수 있게
-    }, 500);
-  },
-  set(key, st) { const s = this.steps.find((x) => x.key === key); if (s) { s.st = st; this.draw(); } },
-  draw() {
-    const icon = { wait: '<i class="ld-dot"></i>', run: '<span class="spin"></span>', ok: '<b class="ld-ok">✓</b>', err: '<b class="ld-bad">!</b>' };
-    const txt = { wait: '대기', run: '불러오는 중', ok: '완료', err: '실패' };
-    $('#ldSteps').innerHTML = this.steps.map((s) => `<li class="${s.st}">${icon[s.st]}<span>${s.label}</span><em>${txt[s.st]}</em></li>`).join('');
-    const done = this.steps.filter((s) => s.st === 'ok' || s.st === 'err').length;
-    $('#ldBar').style.width = (this.steps.length ? Math.round(done / this.steps.length * 100) : 0) + '%';
-  },
-  error(msg) { $('#ldErr').textContent = msg; $('#ldErr').hidden = false; $('#ldClose').hidden = false; },
-  close() { clearInterval(this.timer); $('#loader').classList.remove('on'); },
-  isOpen() { return $('#loader').classList.contains('on'); },
-};
-// 작업(promise)의 진행 상태를 팝업 단계에 연결
-function track(key, p) {
-  Loader.set(key, 'run');
-  return p.then((v) => { Loader.set(key, 'ok'); return v; }, (e) => { Loader.set(key, 'err'); throw e; });
-}
-
 async function init() {
   buildDongSelect();
   setPreset(91);
   bindUI();
-  Loader.open('관악구 부동산 자료를 불러오는 중입니다', [
-    ['base', '지도 · 행정동 경계 · 추천매물'], ['sale', '매매 실거래가 (서울시)'], ['rent', '전세 · 월세 실거래가 (서울시)'],
-    ['reb', '아파트 가격지수 (한국부동산원)'], ['market', '시장 지표 · 수급 · 거래량 (한국부동산원)'],
-  ]);
   initMap();
-  const marketP = track('market', api('/api/market'));
-  let baseOk = true;
-  try {
-    const [dongs, geo, dev, listings] = await track('base', Promise.all([
-      api('/data/gwanak_dongs.geojson'), api('/api/geocache'), api('/api/development'), api('/api/listings'),
-    ]));
-    S.dongs = dongs; S.geo = geo; S.dev = dev; S.listings = listings;
-    drawDongs(); drawDev();
-    buildDongSelect();
-  } catch (e) { baseOk = false; }
-  loadMarket(marketP);
-  const dataOk = await loadAll(true);
-  await marketP.catch(() => {});
-  if (baseOk && dataOk) Loader.close();
-  else Loader.error('일부 자료를 불러오지 못했습니다. 서버(node server.js)가 실행 중인지, 인터넷 연결을 확인한 뒤 새로고침해 주세요.');
+  const [dongs, geo, dev, listings] = await Promise.all([
+    api('/data/gwanak_dongs.geojson'), api('/api/geocache'), api('/api/development'), api('/api/listings'),
+  ]);
+  S.dongs = dongs; S.geo = geo; S.dev = dev; S.listings = listings;
+  drawDongs(); drawDev();
+  buildDongSelect();
+  loadMarket();
+  await loadAll();
   if (location.hash === '#print') setTimeout(doPrint, 2500);
   // 백그라운드 위치 확보가 진행되는 동안 주기적으로 갱신
   setInterval(async () => {
@@ -181,7 +135,6 @@ function bindUI() {
   $('#addListBtn').onclick = () => openListDlg();
   $('#printBtn').onclick = doPrint;
   $('#goAnalysis').onclick = scrollToAnalysis;
-  $('#ldClose').onclick = () => Loader.close();
   $('#fromDt').min = $('#toDt').min = toInput(DATA_START); // 실거래 자료 제공 시작일 이전은 선택 불가
   window.addEventListener('beforeprint', beforePrint);
   window.addEventListener('afterprint', afterPrint);
@@ -190,33 +143,21 @@ function bindUI() {
 }
 const seg = (s, b) => $$(s + ' button').forEach((x) => x.classList.toggle('on', x === b));
 
-// first=true: 첫 로딩(팝업은 init에서 관리). 기간 변경 시에는 0.7초 넘게 걸릴 때만 팝업을 띄움
-async function loadAll(first) {
-  let popT = null;
-  if (!first) {
-    popT = setTimeout(() => {
-      Loader.open(`${toInput(S.from)} ~ ${toInput(S.to)} 기간 자료를 불러오는 중입니다`, [['sale', '매매 실거래가 (서울시)'], ['rent', '전세 · 월세 실거래가 (서울시)']]);
-      Loader.set('sale', 'run'); Loader.set('rent', 'run');
-    }, 700);
-  }
+async function loadAll() {
+  setNotice('<span class="spin"></span>실거래 · 부동산원 자료를 불러오는 중입니다… (최초 조회 시 30초 정도 걸릴 수 있습니다)');
   try {
     const [sale, rent, w, m] = await Promise.all([
-      track('sale', api(`/api/trades?kind=sale&from=${S.from}&to=${S.to}`)),
-      track('rent', api(`/api/trades?kind=rent&from=${S.from}&to=${S.to}`)),
-      S.reb.weekly ? S.reb.weekly : track('reb', api('/api/reb?cycle=weekly')),
+      api(`/api/trades?kind=sale&from=${S.from}&to=${S.to}`),
+      api(`/api/trades?kind=rent&from=${S.from}&to=${S.to}`),
+      S.reb.weekly ? S.reb.weekly : api('/api/reb?cycle=weekly'),
       S.reb.monthly ? S.reb.monthly : api('/api/reb?cycle=monthly'),
     ]);
     S.sale = sale.rows || []; S.rent = rent.rows || []; S.reb = { weekly: w, monthly: m };
     // 서울시 실거래 공개 API는 2024년 접수분부터만 제공
     setNotice(S.from < DATA_START ? `서울시 실거래 공개자료는 <b>2024년 1월 이후</b> 자료만 제공됩니다. 그 이전 기간은 거래가 0건으로 보이며, 부동산원 지수·시장 지표만 참고하세요.` : '');
     renderAll();
-    if (!first) { clearTimeout(popT); Loader.close(); }
-    return true;
   } catch (e) {
-    clearTimeout(popT);
     setNotice('자료를 불러오지 못했습니다. 서버(node server.js)가 실행 중인지 확인해 주세요. ' + e.message);
-    if (!first && Loader.isOpen()) Loader.error('자료를 불러오지 못했습니다: ' + e.message);
-    return false;
   }
 }
 function setNotice(h) { const n = $('#notice'); n.innerHTML = h; n.classList.toggle('on', !!h); }
@@ -706,9 +647,9 @@ function drawPois(c, pois) {
 }
 
 // ---------- 시장 지표 ----------
-async function loadMarket(pre) {
+async function loadMarket() {
   try {
-    const m = await (pre || api('/api/market'));
+    const m = await api('/api/market');
     renderMarket(m);
   } catch (e) { $('#mkChips').innerHTML = `<div class="none">시장 지표를 불러오지 못했습니다: ${esc(e.message)}</div>`; }
   api('/api/molit').then(renderMolit).catch((e) => renderMolit({ ok: false, msg: e.message }));
