@@ -15,6 +15,10 @@
 - **절대 커밋 금지**: `config.json`(API 키), `public/assets/card.png`(대표자 이름이 찍힌 명함), `backup/`, 캐시·로그 — `.gitignore` 에 등록됨. 커밋 전 `git status` 로 확인하고, 키 문자열이 포함된 파일이 없는지 검사한다.
 - 새 설정 항목을 추가하면 `config.example.json` 에도 빈 값으로 추가한다.
 - 커밋·푸시는 사용자가 요청할 때만 한다.
+- **공개 사이트(GitHub Pages)**: https://estateagency-ctrl.github.io/gwanak-realestate-dashboard/ — `main` 브랜치 `/docs` 폴더를 그대로 보여줌.
+  - `docs/` 는 `node build-site.js`(서버 실행 중 필요)로 만드는 결과물이다. **docs/ 안 파일을 직접 고치지 말고** `public/` 을 고친 뒤 build-site.js 를 다시 실행한다.
+  - 화면(`public/app.js`)은 주소가 localhost가 아니면(또는 `?static`) 정적 모드로 동작: `data/*.json` 스냅샷을 읽고, 매물 등록·수정 숨김, 없는 주변시설은 브라우저에서 Overpass 직접 조회.
+  - docs/에 서울시·부동산원·공공데이터포털 키가 들어가지 않았는지 커밋 전 확인(브이월드 키는 브라우저용이라 포함, 예전 gwanak-dashboard 사이트에도 이미 공개됨).
 
 ## 실행
 - `node server.js` (Node 18+, 외부 패키지 없음) → http://localhost:8790 . 또는 `대시보드실행.command` 더블클릭.

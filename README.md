@@ -1,5 +1,23 @@
 # SK부동산 · 관악구 부동산 브리핑 대시보드
 
+## 공개 사이트 (GitHub Pages)
+- 주소: https://estateagency-ctrl.github.io/gwanak-realestate-dashboard/
+- 서버 없이 `docs/` 폴더의 데이터 스냅샷(JSON)을 읽어 표시합니다. 서울시·부동산원·공공데이터포털 API 키는 포함되지 않습니다(브이월드 지도 키만 브라우저용으로 포함).
+- 공개 사이트에서는 추천매물 등록·수정 버튼이 숨겨집니다. 매물을 바꾸려면 내 컴퓨터에서 등록한 뒤 아래 갱신 절차를 실행하세요.
+
+### 공개 사이트 데이터 갱신
+```bash
+node server.js
+```
+위 서버를 켜 둔 채 다른 터미널에서:
+```bash
+node build-site.js
+```
+```bash
+git add -A && git commit -m "공개 사이트 데이터 갱신" && git push
+```
+1~3분 뒤 공개 사이트에 반영됩니다.
+
 ## 처음 설정 (API 키)
 API 키는 저장소에 포함되어 있지 않습니다. 아래처럼 설정 파일을 만들고 각 사이트에서 발급받은 키를 넣으세요.
 ```bash

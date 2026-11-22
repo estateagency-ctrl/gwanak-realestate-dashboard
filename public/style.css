@@ -126,6 +126,7 @@ select:focus,input:focus,textarea:focus{outline:2px solid rgba(215,38,43,.25);bo
 .lcard .lm{font-size:12px;color:var(--ink2);margin-top:4px}
 .lcard .lf{font-size:12px;color:var(--mute);margin-top:6px;min-height:36px}
 .lcard .edit{position:absolute;top:10px;right:10px;border:0;background:none;color:var(--mute);cursor:pointer;font-size:12px}
+body.static #addListBtn,body.static .lcard .edit{display:none} /* 공개 사이트에서는 매물 등록·수정 숨김 */
 .lcard .edit:hover{color:var(--red)}
 .lcard .rt{font-size:11.5px;color:var(--ink2);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
 

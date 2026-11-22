@@ -36,7 +36,55 @@ const fmtDist = (m) => m < 995 ? Math.round(m / 10) * 10 + 'm' : (m / 1000).toFi
 const walk = (m) => Math.max(1, Math.round(m * 1.25 / 67)) + '분'; // 직선거리×1.25 보정, 분당 67m
 
 // ---------- API ----------
-const api = (u, o) => fetch(u, o).then((r) => r.json());
+// 내 컴퓨터(localhost): node server.js 로 실시간 조회
+// 공개 사이트(GitHub Pages 등): 서버 없이 data/ 폴더의 스냅샷(JSON)을 읽음  (?static 을 붙이면 로컬에서도 시험 가능)
+const STATIC = new URLSearchParams(location.search).has('static') || !['localhost', '127.0.0.1'].includes(location.hostname);
+const getJ = (u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
+const api = (u, o) => (STATIC ? staticApi(u, o) : fetch(u, o).then((r) => r.json()));
+const SNAP = {}; // 스냅샷 파일 메모리 캐시
+const snap = (f) => (SNAP[f] = SNAP[f] || getJ('data/' + f));
+async function staticApi(u, o) {
+  if (o && o.method === 'POST') throw new Error('공개 사이트에서는 매물을 등록·수정할 수 없습니다.');
+  const url = new URL(u, location.href), q = Object.fromEntries(url.searchParams), p = url.pathname.replace(/^.*\/(api|data)\//, '/$1/');
+  if (p === '/data/gwanak_dongs.geojson') return snap('gwanak_dongs.geojson');
+  if (p === '/api/geocache') return snap('geocache.json');
+  if (p === '/api/development') return snap('development.json');
+  if (p === '/api/listings') return snap('listings.json');
+  if (p === '/api/market') return snap('market.json');
+  if (p === '/api/molit') return snap('molit.json').catch(() => ({ ok: false, msg: '공개 사이트에서는 제공하지 않는 항목입니다.' }));
+  if (p === '/api/config') return snap('site.json');
+  if (p === '/api/reb') return snap(`reb_${q.cycle === 'monthly' ? 'monthly' : 'weekly'}.json`);
+  if (p === '/api/trades') { // 계약연도별 파일을 받아 기간으로 거르기
+    const meta = await snap('meta.json');
+    const rows = [];
+    for (let y = +q.from.slice(0, 4); y <= +q.to.slice(0, 4); y++) {
+      if (!meta.years.includes(y)) continue;
+      (await snap(`${q.kind}_${y}.json`)).forEach((r) => { if (r.d >= q.from && r.d <= q.to) rows.push(r); });
+    }
+    return { kind: q.kind, rows };
+  }
+  if (p === '/api/geocode') { // 스냅샷에 있는 좌표만
+    const g = await snap('geocache.json');
+    return Object.fromEntries((q.items || '').split('~').filter(Boolean).map((k) => [k, g[k] || null]));
+  }
+  if (p === '/api/poi') { // 미리 받은 주변시설 → 없으면 브라우저에서 OpenStreetMap 직접 조회
+    const cache = await snap('poi.json').catch(() => ({}));
+    const key = `${(+q.lat).toFixed(4)},${(+q.lon).toFixed(4)}`;
+    return { pois: cache[key] || await overpassPois(+q.lat, +q.lon) };
+  }
+  throw new Error('지원하지 않는 요청: ' + p);
+}
+async function overpassPois(lat, lon) {
+  const a = (r) => `(around:${r},${lat},${lon})`;
+  const q = `[out:json][timeout:40];(nwr${a(1500)}["railway"="station"];nwr${a(1500)}["public_transport"="station"]["subway"="yes"];node${a(500)}["highway"="bus_stop"];nwr${a(1500)}["amenity"~"^(school|kindergarten|university)$"];nwr${a(1200)}["amenity"~"^(marketplace|bank|townhall|police|post_office|hospital|library|fire_station|community_centre)$"];nwr${a(1200)}["shop"~"^(supermarket|department_store|mall)$"];nwr${a(1200)}["office"="government"];nwr${a(1200)}["leisure"="park"]["name"];);out center tags;`;
+  let j, err;
+  for (const u of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+    try { const r = await fetch(u, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); if (!r.ok) throw new Error('HTTP ' + r.status); j = await r.json(); break; } catch (e) { err = e; }
+  }
+  if (!j) throw err;
+  return (j.elements || []).map((e) => ({ t: e.tags || {}, lat: e.lat ?? e.center?.lat, lon: e.lon ?? e.center?.lon })).filter((e) => e.lat && e.t.name)
+    .map((e) => ({ name: e.t.name, lat: e.lat, lon: e.lon, k: e.t.railway || (e.t.subway ? 'station' : '') || e.t.highway || e.t.amenity || e.t.shop || (e.t.office ? 'government' : '') || e.t.leisure, line: e.t.line || e.t['subway:line'] || e.t.network || '', op: e.t.operator || '' }));
+}
 
 // ---------- 행정동 판별 ----------
 function pip(pt, poly) { // ray casting, poly = [[lon,lat],...]
@@ -79,6 +127,10 @@ const dongLabel = () => S.dong === 'all' ? '관악구 전체' : S.dong.split(':'
 
 // ---------- 초기화 ----------
 async function init() {
+  if (STATIC) { // 공개 사이트: 매물 등록·수정 숨김, 데이터 기준일 표시
+    document.body.classList.add('static');
+    snap('meta.json').then((m) => { $('.hdr-title p').textContent = `국토교통부 실거래(서울시 열린데이터광장) · 한국부동산원 · 데이터 기준일 ${m.updated}`; }).catch(() => {});
+  }
   buildDongSelect();
   setPreset(91);
   bindUI();
@@ -144,7 +196,7 @@ function bindUI() {
 const seg = (s, b) => $$(s + ' button').forEach((x) => x.classList.toggle('on', x === b));
 
 async function loadAll() {
-  setNotice('<span class="spin"></span>실거래 · 부동산원 자료를 불러오는 중입니다… (최초 조회 시 30초 정도 걸릴 수 있습니다)');
+  setNotice(STATIC ? '<span class="spin"></span>자료를 불러오는 중입니다…' : '<span class="spin"></span>실거래 · 부동산원 자료를 불러오는 중입니다… (최초 조회 시 30초 정도 걸릴 수 있습니다)');
   try {
     const [sale, rent, w, m] = await Promise.all([
       api(`/api/trades?kind=sale&from=${S.from}&to=${S.to}`),

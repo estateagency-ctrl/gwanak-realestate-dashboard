@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 175" role="img" aria-label="SK부동산">
+  <g fill="#454545">
+    <polygon points="0,96 50,4 72,4 22,96"/>
+    <polygon points="56,4 72,4 142,96 126,96"/>
+    <polygon points="79,4 95,4 165,96 149,96"/>
+    <polygon points="102,4 118,4 188,96 172,96"/>
+    <polygon points="125,4 141,4 210,96 194,96"/>
+  </g>
+  <rect x="110" y="104" width="20" height="70" fill="#C8643B"/>
+  <rect x="138" y="104" width="20" height="70" fill="#B8235A"/>
+  <rect x="166" y="104" width="20" height="70" fill="#7A2E8C"/>
+</svg>
