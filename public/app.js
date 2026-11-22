@@ -421,7 +421,12 @@ function drawTopMarkers() {
     m.on('click', () => selectComplex(t.key, true));
     m.addTo(S.layers.top); pts.push([c.lat, c.lon]);
   });
-  if (pts.length && (!S.selKey || S.autoSel) && S.dong === 'all') map.fitBounds(pts, { paddingTopLeft: [20, 20], paddingBottomRight: [130, 20], maxZoom: 15 });
+  // 첫 화면: TOP 10이 다 들어오는 배율에서 + 버튼 3번만큼(3단계) 더 확대.
+  // 그만큼 확대하면 단지들 한가운데는 빈 곳이 되므로 1위 단지(아래 입지분석과 같은 단지)를 가운데에 둠
+  if (pts.length && (!S.selKey || S.autoSel) && S.dong === 'all') {
+    const fitZ = Math.min(map.getBoundsZoom(L.latLngBounds(pts), false, L.point(150, 40)), 15);
+    map.setView(pts[0], Math.min(fitZ + 3, 18));
+  }
 }
 function popupHtml(t) {
   const r = t.last;
