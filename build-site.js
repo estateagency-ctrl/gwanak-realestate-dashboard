@@ -49,7 +49,9 @@ const write = (name, obj) => {
     const r = await get(`/api/trades?kind=rent&from=${y}0101&to=${y}1231`);
     if (!s.rows.length && !r.rows.length) continue;
     years.push(y);
-    console.log(`실거래 ${y}년: 매매 ${s.rows.length}건(${write(`sale_${y}.json`, s.rows)}), 전월세 ${r.rows.length}건(${write(`rent_${y}.json`, r.rows)})`);
+    // 화면에서 쓰지 않는 항목(지번·신고구분·계약기간)은 빼서 휴대폰이 받는 용량을 줄임
+    const slim = (rows) => rows.map(({ jb, how, prd, ...rest }) => rest);
+    console.log(`실거래 ${y}년: 매매 ${s.rows.length}건(${write(`sale_${y}.json`, slim(s.rows))}), 전월세 ${r.rows.length}건(${write(`rent_${y}.json`, slim(r.rows))})`);
   }
 
   // 부동산원 지수·시장지표, 국토부 거래특성, 좌표, 개발계획, 매물

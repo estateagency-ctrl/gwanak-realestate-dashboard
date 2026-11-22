@@ -169,19 +169,21 @@ function setPreset(days) {
   $$('#presetSeg button').forEach((b) => b.classList.toggle('on', +b.dataset.d === days));
 }
 
+// 버튼을 누르면 먼저 버튼 모양부터 바꿔 화면에 그린 뒤(즉시 반응), 무거운 표·차트 다시 그리기는 그다음에 실행
+const soon = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
 function bindUI() {
-  $('#dongSel').onchange = (e) => { S.dong = e.target.value; renderAll(); highlightDong(); };
-  $('#usgSel').onchange = (e) => { S.usg = e.target.value; renderAll(); };
-  $$('#cycleSeg button').forEach((b) => b.onclick = () => { S.cycle = b.dataset.v; seg('#cycleSeg', b); renderCharts(); renderKpis(); });
-  $$('#presetSeg button').forEach((b) => b.onclick = () => { setPreset(+b.dataset.d); loadAll(); });
+  $('#dongSel').onchange = (e) => { S.dong = e.target.value; soon(() => { renderAll(); highlightDong(); }); };
+  $('#usgSel').onchange = (e) => { S.usg = e.target.value; soon(renderAll); };
+  $$('#cycleSeg button').forEach((b) => b.onclick = () => { S.cycle = b.dataset.v; seg('#cycleSeg', b); soon(() => { renderCharts(); renderKpis(); }); });
+  $$('#presetSeg button').forEach((b) => b.onclick = () => { setPreset(+b.dataset.d); soon(loadAll); });
   $('#applyBtn').onclick = () => {
     const f = fromInput($('#fromDt').value), t = fromInput($('#toDt').value);
     if (!f || !t || f > t) return alert('기간을 확인해 주세요.');
     if (t < DATA_START) return alert('서울시 실거래 공개자료는 2024년 1월 이후 자료만 제공됩니다. 2024년 이후 날짜를 선택해 주세요.');
-    S.from = f; S.to = t; $$('#presetSeg button').forEach((b) => b.classList.remove('on')); loadAll();
+    S.from = f; S.to = t; $$('#presetSeg button').forEach((b) => b.classList.remove('on')); soon(loadAll);
   };
-  $$('#sortSeg button').forEach((b) => b.onclick = () => { S.sort = b.dataset.v; seg('#sortSeg', b); renderTop(); });
-  $$('#topTabs button').forEach((b) => b.onclick = () => { S.topTab = b.dataset.v; seg('#topTabs', b); renderTop(); });
+  $$('#sortSeg button').forEach((b) => b.onclick = () => { S.sort = b.dataset.v; seg('#sortSeg', b); soon(renderTop); });
+  $$('#topTabs button').forEach((b) => b.onclick = () => { S.topTab = b.dataset.v; seg('#topTabs', b); soon(renderTop); });
   $('#tgDong').onchange = (e) => toggleLayer('dongs', e.target.checked);
   $('#tgDev').onchange = (e) => toggleLayer('dev', e.target.checked);
   $('#tgList').onchange = (e) => toggleLayer('list', e.target.checked);
@@ -335,7 +337,12 @@ function renderTop() {
   ensureGeo(S.top.map((t) => t.key)).then(drawTopMarkers);
   drawTopMarkers();
   // 아직 직접 고른 단지가 없으면 현재 조건의 1위 단지 입지분석을 미리 펼쳐 둠(지도·스크롤은 그대로)
-  if (S.autoSel && S.selKey !== S.top[0].key) selectComplex(S.top[0].key, false, null, 'auto');
+  // 첫 화면·버튼 반응을 먼저 끝낸 뒤 브라우저가 한가할 때 실행(휴대폰에서 버튼이 밀리지 않게)
+  if (S.autoSel && S.selKey !== S.top[0].key && S.autoPending !== S.top[0].key) {
+    const k = S.autoPending = S.top[0].key;
+    const run = () => { S.autoPending = null; if (S.autoSel && S.top[0] && S.top[0].key === k && S.selKey !== k) selectComplex(k, false, null, 'auto'); };
+    'requestIdleCallback' in window ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 600);
+  }
 }
 async function ensureGeo(keys) {
   const miss = keys.filter((k) => S.geo[k] === undefined);
@@ -837,14 +844,31 @@ function afterPrint() {
   document.body.classList.remove('printing', 'map-frozen');
   $$('img.print-img').forEach((i) => i.parentNode.removeChild(i));
 }
+// 카카오톡·네이버·인스타그램 등 앱 안의 브라우저는 인쇄 기능이 없음 → 외부 브라우저로 열도록 안내
+function inAppBrowser() {
+  const ua = navigator.userAgent;
+  if (/KAKAOTALK/i.test(ua)) return 'kakao';
+  if (/Line\//i.test(ua)) return 'line';
+  if (/NAVER\(inapp|NAVER/i.test(ua) && !/Whale/i.test(ua)) return '네이버 앱';
+  if (/Instagram|FBAN|FBAV|DaumApps|everytimeApp|BAND\//i.test(ua)) return '앱';
+  return '';
+}
 function doPrint() {
-  beforePrint();
+  const pageUrl = location.origin + location.pathname;
+  const app = inAppBrowser();
+  if (app === 'kakao') { // 카카오톡: 외부 브라우저로 바로 열기
+    if (confirm('카카오톡 안의 브라우저는 인쇄를 지원하지 않습니다.\n크롬/사파리로 열어서 인쇄할까요?')) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(pageUrl);
+    return;
+  }
+  if (app === 'line') { location.href = pageUrl + '?openExternalBrowser=1'; return; }
+  if (app) { alert(`${app} 안의 브라우저는 인쇄를 지원하지 않습니다.\n오른쪽 위(또는 아래) 메뉴에서 '다른 브라우저로 열기'를 누른 뒤 인쇄해 주세요.`); return; }
   // 앱 미리보기 창(iframe 등)에서는 인쇄가 막히는 경우가 있어 새 창으로 열어 인쇄
   const framed = (() => { try { return window.self !== window.top; } catch { return true; } })();
-  if (framed) { window.open(location.origin + location.pathname + '#print', '_blank'); return; }
-  setTimeout(() => {
-    try { window.print(); } catch (e) { window.open(location.origin + location.pathname + '#print', '_blank'); }
-  }, 300);
+  if (framed) { window.open(pageUrl + '#print', '_blank'); return; }
+  if (typeof window.print !== 'function') { alert('이 브라우저는 인쇄를 지원하지 않습니다. 크롬이나 사파리에서 열어 주세요.'); return; }
+  beforePrint();
+  // 휴대폰(특히 아이폰)은 누르는 순간 바로 실행해야 인쇄 창이 뜸 → 지연 없이 즉시 호출
+  try { window.print(); } catch (e) { alert('인쇄 창을 열지 못했습니다. 브라우저 메뉴의 "인쇄" 또는 "공유 → 인쇄"를 이용해 주세요.'); }
 }
 
 init();

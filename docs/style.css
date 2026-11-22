@@ -9,6 +9,11 @@
 html,body{margin:0}
 body{font-family:"Noto Sans KR",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
+/* 휴대폰 터치 반응: 두 번 톡(확대) 대기 없이 바로 반응 + 누르는 순간 표시 */
+html{-webkit-tap-highlight-color:rgba(215,38,43,.12)}
+button,a,select,input,label,.toplist li,.lcard,.leaflet-marker-icon{touch-action:manipulation}
+.btn:active,.seg button:active,.tabs button:active{transform:scale(.96)}
+.toplist li:active,.lcard:active{background:#fff1f1}
 h1,h2,h3,h4{margin:0;letter-spacing:-.02em}
 .sk{color:var(--red);font-weight:900;letter-spacing:-.04em;margin-right:2px}
 
