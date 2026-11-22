@@ -226,7 +226,21 @@ dialog::backdrop{background:rgba(15,20,25,.45)}
 }
 @media (max-width:640px){
   .hdr-in,.f-in,.wrap{padding-left:16px;padding-right:16px}
-  .brand{border:0;padding:0}.brand-sub{display:none}.hdr-right .btn{display:none}
+  .brand{border:0;padding:0}.brand-sub{display:none}
+  /* 휴대폰: 헤더를 한 줄에 맞추고 인쇄 버튼은 짧게 */
+  .hdr-in{gap:10px;padding-top:10px;padding-bottom:10px}
+  .logo{height:36px}.brand-name{font-size:21px}.brand-name .sk{font-size:24px}
+  .hdr-right{gap:8px;margin-left:auto}
+  .tel{font-size:16px}.tel span{font-size:10px}
+  #printBtn{padding:6px 10px;min-height:34px;font-size:13px;white-space:nowrap}
+  #printBtn .pt-long{display:none}
+}
+@media (max-width:360px){ /* 아주 좁은 휴대폰: 인쇄 버튼은 아이콘만 */
+  .hdr-in{gap:8px}
+  .logo{height:32px}.brand-name{font-size:19px}.brand-name .sk{font-size:22px}
+  .tel{font-size:15px}
+  #printBtn{padding:6px 9px}
+  #printBtn .pt-short{display:none}
   .kpis,.list-grid,.an-grid,.dev-list,.mk-grid{grid-template-columns:1fr}
   .mk-chips{grid-template-columns:1fr 1fr}
   .an-box.wide{grid-column:auto}
