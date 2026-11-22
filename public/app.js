@@ -12,6 +12,7 @@ const S = {
   topTab: 'sale', sort: 'price', listMenu: '전체',
   sale: [], rent: [], reb: {}, geo: {}, dongs: null, dev: [], listings: [],
   top: [], selKey: null, charts: {}, layers: {},
+  autoSel: true, // true: 사용자가 단지를 직접 고르기 전까지 TOP 10 1위의 입지분석을 자동으로 펼쳐 둠
 };
 
 // ---------- 포맷 ----------
@@ -333,6 +334,8 @@ function renderTop() {
   $$('#topList li[data-k]').forEach((li) => li.onclick = () => selectComplex(li.dataset.k, false, null, 'map'));
   ensureGeo(S.top.map((t) => t.key)).then(drawTopMarkers);
   drawTopMarkers();
+  // 아직 직접 고른 단지가 없으면 현재 조건의 1위 단지 입지분석을 미리 펼쳐 둠(지도·스크롤은 그대로)
+  if (S.autoSel && S.selKey !== S.top[0].key) selectComplex(S.top[0].key, false, null, 'auto');
 }
 async function ensureGeo(keys) {
   const miss = keys.filter((k) => S.geo[k] === undefined);
@@ -411,7 +414,7 @@ function drawTopMarkers() {
     m.on('click', () => selectComplex(t.key, true));
     m.addTo(S.layers.top); pts.push([c.lat, c.lon]);
   });
-  if (pts.length && !S.selKey && S.dong === 'all') map.fitBounds(pts, { paddingTopLeft: [20, 20], paddingBottomRight: [130, 20], maxZoom: 15 });
+  if (pts.length && (!S.selKey || S.autoSel) && S.dong === 'all') map.fitBounds(pts, { paddingTopLeft: [20, 20], paddingBottomRight: [130, 20], maxZoom: 15 });
 }
 function popupHtml(t) {
   const r = t.last;
@@ -496,15 +499,20 @@ function scrollToAnalysis() {
   scrollTo({ top: y, behavior: 'smooth' });
 }
 async function selectComplex(key, fromMap, listing, scrollMode) {
+  const auto = scrollMode === 'auto'; // 1위 자동 표시: 지도 확대·주변시설 마커·스크롤 없이 입지분석만 펼침
+  if (!auto) S.autoSel = false;       // 사용자가 직접 고르면 그 뒤로는 자동 표시 안 함
   S.selKey = key;
   const [dong, nm] = key.split('|');
   $$('#topList li').forEach((li) => li.classList.toggle('sel', li.dataset.k === key));
   $$('#listGrid .lcard').forEach((c) => { const l = S.listings.find((x) => x.id === c.dataset.id); c.classList.toggle('sel', l && `${l.dong}|${l.nm}` === key); });
   await ensureGeo([key]);
+  if (S.selKey !== key) return;
   drawTopMarkers();
   const c = coordOf(dong, nm);
-  map.setView([c.lat, c.lon], 16, { animate: true });
-  $('#mapTitle').textContent = `${nm} 주변 · 최근 실거래가`;
+  if (!auto) {
+    map.setView([c.lat, c.lon], 16, { animate: true });
+    $('#mapTitle').textContent = `${nm} 주변 · 최근 실거래가`;
+  } else S.layers.poi.clearLayers();
   $('#goAnalysis').hidden = false;
   const sec = $('#analysis');
   sec.innerHTML = `<div class="loading"><span class="spin"></span>${esc(nm)} 입지분석 자료를 불러오는 중…</div>`;
@@ -521,7 +529,7 @@ async function selectComplex(key, fromMap, listing, scrollMode) {
   if (S.selKey !== key) return;
   const sales = s2.rows.filter((r) => keyOf(r) === key).sort((a, b) => b.d.localeCompare(a.d));
   const rents = r2.rows.filter((r) => keyOf(r) === key).sort((a, b) => b.d.localeCompare(a.d));
-  const ctx = { key, dong, nm, c, sales, rents, pois: [], loadingPoi: true, listing };
+  const ctx = { key, dong, nm, c, sales, rents, pois: [], loadingPoi: true, listing, auto };
   const t = setTimeout(() => { if (S.selKey !== key) return; renderAnalysis(ctx); if (scrollMode === 'analysis') { scrollMode = null; scrollToAnalysis(); } }, 400); // 주변시설이 늦으면 먼저 표시
   const poiRes = await poiP;
   clearTimeout(t);
@@ -529,7 +537,7 @@ async function selectComplex(key, fromMap, listing, scrollMode) {
   const pois = (poiRes.pois || []).map((p) => ({ ...p, dist: distM(c.lat, c.lon, p.lat, p.lon) })).sort((a, b) => a.dist - b.dist);
   renderAnalysis({ ...ctx, pois, loadingPoi: false, poiErr: poiRes.error });
   if (scrollMode === 'analysis') scrollToAnalysis();
-  drawPois(c, pois);
+  if (!auto) drawPois(c, pois);
 }
 
 const LINE_COLOR = { '2': '#00A84D', '신림': '#6789CA', '4': '#00A5DE', '7': '#747F00', '1': '#0052A4' };
@@ -574,7 +582,7 @@ function scoreOf(P, devNear) {
   return { trans, edu, comm, life, dev, total: Math.round((trans * .3 + edu * .2 + comm * .2 + life * .15 + dev * .15)) };
 }
 
-function renderAnalysis({ dong, nm, c, sales, rents, pois, poiErr, listing, loadingPoi }) {
+function renderAnalysis({ dong, nm, c, sales, rents, pois, poiErr, listing, loadingPoi, auto }) {
   const P = classify(pois);
   const hd = c.approx ? null : hdongOf(c.lat, c.lon);
   const devs = S.dev.map((d) => ({ ...d, dist: distM(c.lat, c.lon, d.lat, d.lon) })).sort((a, b) => a.dist - b.dist);
@@ -598,9 +606,10 @@ function renderAnalysis({ dong, nm, c, sales, rents, pois, poiErr, listing, load
   $('#analysis').innerHTML = `
     <div class="an-head">
       <div>
-        <div style="font-size:12px;color:var(--red);font-weight:800">입지분석 리포트 · SK부동산</div>
+        <div style="font-size:12px;color:var(--red);font-weight:800">입지분석 리포트 · SK부동산${auto ? ` · <span class="auto-badge">현재 ${esc(dongLabel())} ${({ sale: '매매', jeonse: '전세', wolse: '월세' })[S.topTab]} TOP 10 1위 (${S.sort === 'price' ? '최고가' : '거래량'} 기준)</span>` : ''}</div>
         <h2>${esc(nm)}</h2>
         <div class="loc">서울 관악구 ${esc(dong)}${hd ? ` · 행정동 ${esc(hd)}` : ''}${yr ? ` · ${yr}년 준공` : ''}${c.approx ? ' · <span style="color:#b45309">위치 근사(정확한 좌표 미확인)</span>' : ''}${listing ? ` · 추천매물 <b style="color:var(--red)">${esc(listing.deal)} ${esc(listing.price)}</b>` : ''}</div>
+        ${auto ? '<div class="auto-hint">다른 단지는 위의 TOP 10 목록·지도·추천매물에서 선택하세요.</div>' : ''}
       </div>
       <div class="an-prices">
         <div class="an-price"><div class="l">최근 매매 실거래</div><div class="v">${ls ? fmtMan(ls.amt) : '-'}</div><div class="s">${ls ? `${fmtD(ls.d)} · ${ls.area}㎡ · ${ls.flr}층` : '최근 2년 거래 없음'}</div></div>

@@ -136,6 +136,9 @@ body.static #addListBtn,body.static .lcard .edit{display:none} /* 공개 사이�
 .an-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:16px}
 .an-head h2{font-size:22px;font-weight:900}
 .an-head .loc{color:var(--mute);font-size:13px;margin-top:2px}
+.auto-badge{display:inline-block;background:var(--red);color:#fff;border-radius:20px;padding:1px 9px;font-size:11px;margin-left:2px}
+.auto-hint{font-size:12px;color:var(--ink2);margin-top:6px}
+@media print{.auto-hint{display:none}}
 .an-prices{display:flex;gap:10px;flex-wrap:wrap}
 .an-price{background:var(--soft);border-radius:10px;padding:8px 14px;min-width:150px}
 .an-price .l{font-size:11.5px;color:var(--mute)}
@@ -226,25 +229,28 @@ dialog::backdrop{background:rgba(15,20,25,.45)}
 }
 @media (max-width:640px){
   .hdr-in,.f-in,.wrap{padding-left:16px;padding-right:16px}
-  .brand{border:0;padding:0}.brand-sub{display:none}
-  /* 휴대폰: 헤더를 한 줄에 맞추고 인쇄 버튼은 짧게 */
-  .hdr-in{gap:10px;padding-top:10px;padding-bottom:10px}
-  .logo{height:36px}.brand-name{font-size:21px}.brand-name .sk{font-size:24px}
-  .hdr-right{gap:8px;margin-left:auto}
-  .tel{font-size:16px}.tel span{font-size:10px}
-  #printBtn{padding:6px 10px;min-height:34px;font-size:13px;white-space:nowrap}
-  #printBtn .pt-long{display:none}
-}
-@media (max-width:360px){ /* 아주 좁은 휴대폰: 인쇄 버튼은 아이콘만 */
-  .hdr-in{gap:8px}
-  .logo{height:32px}.brand-name{font-size:19px}.brand-name .sk{font-size:22px}
-  .tel{font-size:15px}
-  #printBtn{padding:6px 9px}
-  #printBtn .pt-short{display:none}
   .kpis,.list-grid,.an-grid,.dev-list,.mk-grid{grid-template-columns:1fr}
   .mk-chips{grid-template-columns:1fr 1fr}
   .an-box.wide{grid-column:auto}
   .score-wrap{grid-template-columns:1fr}
+  /* 휴대폰 헤더: 전화·인쇄 버튼은 항상 보이고, 공간이 모자라면 상호 쪽이 줄어듦(큰 글씨 설정에도 버튼이 밀려나지 않게) */
+  .hdr-in{gap:10px;padding-top:10px;padding-bottom:10px;flex-wrap:nowrap}
+  .brand{border:0;padding:0;gap:8px;flex:1 1 auto;min-width:0;overflow:hidden}
+  .brand-txt{min-width:0;overflow:hidden}
+  .brand-name{overflow:hidden;text-overflow:ellipsis}
+  .brand-sub{display:none}
+  .logo{height:36px;flex:none}.brand-name{font-size:21px}.brand-name .sk{font-size:24px}
+  .hdr-right{gap:8px;margin-left:auto;flex:none}
+  .tel{font-size:16px}.tel span{display:none}
+  #printBtn{display:inline-flex;align-items:center;gap:2px;padding:6px 10px;min-height:34px;font-size:13px;white-space:nowrap}
+  #printBtn .pt-long{display:none}
+}
+@media (max-width:380px){ /* 좁은 휴대폰: 인쇄 버튼은 아이콘만, 글자 조금 작게 */
+  .hdr-in{gap:8px}
+  .logo{height:30px}.brand-name{font-size:18px}.brand-name .sk{font-size:21px}
+  .tel{font-size:14px}
+  #printBtn{padding:6px 9px;font-size:15px}
+  #printBtn .pt-short{display:none}
 }
 @page{size:A4 landscape;margin:9mm}
 @media print{

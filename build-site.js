@@ -34,6 +34,10 @@ const write = (name, obj) => {
 
   // 화면 파일 복사 (명함 사진 card.png 는 개인정보라 제외)
   for (const f of ['index.html', 'app.js', 'style.css', 'assets/logo.svg']) fs.copyFileSync(path.join(__dirname, 'public', f), path.join(OUT, f));
+  // 휴대폰 등이 예전 파일을 계속 쓰지 않도록 style.css · app.js 주소에 버전 표시(?v=만든시각)를 붙임
+  const ver = new Date().toISOString().replace(/\D/g, '').slice(0, 12);
+  const idx = path.join(OUT, 'index.html');
+  fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').replace(/href="style\.css(\?v=\w+)?"/, `href="style.css?v=${ver}"`).replace(/src="app\.js(\?v=\w+)?"/, `src="app.js?v=${ver}"`));
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
   console.log('화면 파일 복사 완료');
 
